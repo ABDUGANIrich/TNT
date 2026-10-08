@@ -13,6 +13,19 @@ const run=(args,cwd)=>{
   assert.equal(r.status,0,`${args.join(' ')}\n${r.stdout}\n${r.stderr}\n${r.error ?? ''}`);return r.stdout;
 };
 const artifacts=path.join(root,'artifacts');await fs.mkdir(artifacts,{recursive:true});
+// A failed verification must not leave a success report for the tarball it replaced.
+await fs.rm(path.join(artifacts,'package-verification.json'),{force:true});
+const packageInfo=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
+const lockInfo=JSON.parse(await fs.readFile(path.join(root,'package-lock.json'),'utf8'));
+assert.ok(!/your-username|progressive-skill-library-local/.test(packageInfo.name),'Replace the provisional package name before packing.');
+assert.notEqual(packageInfo.private,true,'Release package is marked private.');
+assert.equal(packageInfo.publishConfig?.access,'public');
+assert.equal(packageInfo.publishConfig?.registry,'https://registry.npmjs.org/');
+for(const metadata of [lockInfo,lockInfo.packages['']]) {
+  assert.equal(metadata.name,packageInfo.name,'Package/lockfile name mismatch.');
+  assert.equal(metadata.version,packageInfo.version,'Package/lockfile version mismatch.');
+}
+assert.deepEqual(lockInfo.packages[''].dependencies,packageInfo.dependencies,'Package/lockfile runtime dependencies differ.');
 const packed=JSON.parse(run(['pack','--json','--pack-destination',artifacts],root));
 const pack=Array.isArray(packed)?packed[0]:Object.values(packed)[0];
 const paths=pack.files.map(f=>f.path);
@@ -30,11 +43,13 @@ try {
   await fs.writeFile(path.join(temp,'package.json'),JSON.stringify({name:'package-smoke-project',version:'1.0.0',private:true}));
   run(['install','--save-dev','--no-audit','--no-fund',tarball],temp);
   await assert.rejects(fs.stat(path.join(temp,'.skill-tree')),{code:'ENOENT'});
-  const packageInfo=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
   const installed=path.join(temp,'node_modules',packageInfo.name);
   const metadata=JSON.parse(await fs.readFile(path.join(installed,'package.json'),'utf8'));
+  assert.equal(metadata.name,packageInfo.name);assert.equal(metadata.version,packageInfo.version);
   for(const hook of ['preinstall','install','postinstall','prepare']) assert.ok(!metadata.scripts?.[hook],`Unexpected lifecycle hook: ${hook}`);
-  assert.ok(!metadata.dependencies || Object.keys(metadata.dependencies).length===0);
+  assert.deepEqual(Object.keys(metadata.dependencies ?? {}),['yaml']);
+  assert.equal(metadata.dependencies.yaml,'2.8.3');
+  await fs.stat(path.join(temp,'node_modules/yaml/package.json'));
   assert.equal(metadata.bin['skill-tree'],'dist/cli.js');
   assert.match(await fs.readFile(path.join(installed,'dist/cli.js'),'utf8'),/^#!\/usr\/bin\/env node\n/);
   await assert.rejects(fs.stat(path.join(temp,'node_modules/typescript')),{code:'ENOENT'});
@@ -54,6 +69,16 @@ try {
   const remaining=JSON.parse(cli('list','--json')).skills;
   assert.ok(remaining.some(s=>s.id==='postgres.migrations'));assert.ok(!remaining.some(s=>s.id==='react.forms'));
   cli('doctor');cli('remove','--all');cli('doctor');
+  cli('install','web/react');
+  const editable=JSON.parse(cli('customize','react.forms','--json')).editFile;
+  await fs.appendFile(path.join(temp,editable),'\nPackaged customization check.\n');cli('sync');
+  assert.match(await fs.readFile(path.join(temp,'.skill-tree/web/react/forms/instructions.md'),'utf8'),/Packaged customization check/);
+  await fs.writeFile(path.join(temp,'example.md'),'---\nname: release-notes\ndescription: >-\n  Review release notes\n  for completeness.\n---\n# Release notes\n\nCompare the notes against the change list.\n');
+  assert.equal(JSON.parse(cli('check','example.md','--json')).compatible,true);
+  const imported=JSON.parse(cli('import','example.md','--json'));assert.ok(imported.editFile);
+  await fs.appendFile(path.join(temp,imported.editFile),'\nInclude migration notes.\n');cli('sync','--dry-run');cli('sync');
+  assert.match(await fs.readFile(path.join(temp,'.skill-tree/custom/example/example.md'),'utf8'),/Include migration notes/);
+  cli('doctor');cli('remove','custom/example');cli('doctor');
   const report={package:packageInfo.name,version:packageInfo.version,node:process.version,platform:process.platform,tarball:pack.filename,sha512Integrity:pack.integrity,packedFiles:paths,packedBytes:pack.size,unpackedBytes:pack.unpackedSize,commands:exercised,verified:'Passed clean tarball installation and packaged CLI smoke checks. No npm publication.'};
   await fs.writeFile(path.join(artifacts,'package-verification.json'),JSON.stringify(report,null,2)+'\n');
   console.log(JSON.stringify({tarball,files:paths.length,packedBytes:pack.size,commands:exercised.length,result:'passed'},null,2));

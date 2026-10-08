@@ -3,6 +3,16 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 
 export const hash = (data: string | Buffer): string => createHash('sha256').update(data).digest('hex');
+// Files cannot alias one another, act as directories, or disagree on the spelling
+// of a shared directory on case-insensitive filesystems.
+export function pathsConflict(a: string, b: string): boolean {
+  const left=a.split('/'); const right=b.split('/');
+  for (let i=0;i<Math.min(left.length,right.length);i++) {
+    if (left[i]!.toLowerCase()!==right[i]!.toLowerCase()) return false;
+    if (left[i]!==right[i]) return true;
+  }
+  return true;
+}
 export function canonical(value: unknown): asserts value is string {
   if (typeof value !== 'string' || !value || value.length > 220 || value.split('/').some(p =>
     !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(p) || /[. ]$/.test(p) || /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(p))) {

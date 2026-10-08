@@ -1,6 +1,6 @@
 # Architecture, state, and recovery
 
-`source.ts` loads bundled/local content into a validated source snapshot. It is separate from installation and performs no network access. `manifest.ts` defines validation; `selection.ts` preserves explicit path intent; `dependencies.ts` calculates the installed closure and reasons. `planner.ts` creates desired files and a reviewable diff. `filesystem.ts` owns locking, staging, commit, and recovery. `router.ts` renders the deterministic catalog. `host.ts` generates one Codex bridge. `state.ts` checks the persisted installation. `service.ts` orchestrates mutations; `cli.ts` handles argument validation and presentation.
+`source.ts` loads bundled/local content into a validated source snapshot. It is separate from installation and performs no network access. `manifest.ts` defines validation; `selection.ts` preserves explicit path intent; `dependencies.ts` calculates the installed closure and reasons. `planner.ts` creates desired files and a reviewable diff. `filesystem.ts` owns locking, staging, commit, and recovery. `router.ts` renders the deterministic catalog. `host.ts` generates one Codex bridge. `state.ts` checks the persisted installation. `service.ts` orchestrates installation mutations; `importer.ts` checks and converts external content; `authoring.ts` registers imports, creates editable source copies, and syncs them through the same transaction. `cli.ts` handles argument validation and presentation.
 
 ## State
 
@@ -12,6 +12,7 @@
 | `.skill-tree/router-template.md` | Locked snapshot of the packaged navigation template |
 | `.skill-tree/navigation.md` | Locked snapshot of the separate user customization used for generation |
 | `.skill-tree-custom.md` | Optional user-owned customization input outside the managed root |
+| `.skill-tree/editable-library/` | Optional user-editable source created by import/customize; excluded from installed file checksums and from the router |
 
 The lock lists every owned root file except itself, since a file cannot contain its own checksum. Its metadata is structurally validated and checked against the selection closure, expected file set, dependency reasons, router generation, and host bridge. This detects inconsistency; it is not a signature or protection against an attacker who rewrites both metadata and content. Back up/version control the installation. `search` validates metadata and file existence without opening leaf/resource bodies; use `doctor` for full checksum verification. Other installed inspection commands verify content hashes before displaying a healthy catalog.
 
@@ -22,7 +23,7 @@ The source revision hashes canonical parsed manifest JSON and sorted declared fi
 1. Acquire `.skill-tree-mutation.lock` exclusively using `wx`. Its PID identifies the owner. Reject a concurrent command or unresolved journal.
 2. Read and validate the old installation; reject modified/missing managed files and unsafe links. Load/validate the full desired source and selection closure. Detect unowned-file or host-entry collisions.
 3. Stage a complete directory under `.skill-tree-transaction/stage`. Preserve unknown files and unchanged file timestamps, remove only owned obsolete files, and write desired content. Scripts are never imported or run.
-4. Recheck live file hashes and the affected bridge, then durably write a journal containing before/after snapshot digests and old/new bridge bytes.
+4. Verify that staged files match every planned path and byte sequence (including exact directory casing). Recheck live file hashes and the affected bridge, then durably write a journal containing before/after snapshot digests and old/new bridge bytes.
 5. Rename the old root into the transaction backup and rename the staged root into place. Replace the bridge through a staged file rename if required.
 6. Atomically mark the journal committed, then remove staging/backup data and release the mutex. Exact repeated operations do not rewrite the root.
 
@@ -44,7 +45,7 @@ Recovery itself acquires `.skill-tree-recovery.lock` to serialize stale-lock rec
 
 ## Limits and decisions
 
-- Node 22.14.0 is the baseline; the package is ESM. Runtime has zero third-party dependencies. Current local verification results are in `docs/verification.md`; the CI matrix is a portability check to run, not evidence that hosted CI already passed.
+- Node 22.14.0 is the baseline; the package is ESM. Runtime has one pinned dependency, `yaml`, for external frontmatter parsing; installation/source manifests remain JSON. Current local verification results are in `docs/verification.md`; the CI matrix is a portability check to run, not evidence that hosted CI already passed.
 - All installations are project-local at a fixed `.skill-tree` path. One active source, no subtree exclusions, no global mode, no package-managed remote fetching, and no multiple-source merge semantics.
 - A mutation copies the existing tree and holds source/content snapshots in memory. Disk work and memory scale with materialized content; hashing also costs linear I/O. This is appropriate for modest text-heavy libraries, not multi-gigabyte assets. Source validation loads even unselected declared files. Router context cost grows with catalog size.
 - File ownership is tracked by path/checksum. Symlinks/junctions in checked paths or managed trees are refused. No attempt is made to follow arbitrary links or support network filesystem guarantees. Cooperative CLI concurrency is locked; a hostile process changing path components between checks is outside this portable filesystem threat model. Run in a trusted project directory.
@@ -52,4 +53,5 @@ Recovery itself acquires `.skill-tree-recovery.lock` to serialize stale-lock rec
 - Unknown regular files are retained. Unknown symlinks cause refusal. Case-fold collisions are rejected for portable manifests. No force overwrite, automatic local-edit merge, or destructive repair mode is provided. `remove --all` intentionally keeps metadata and any user files.
 - Local source paths in state are absolute so future installs can find the source; routers remain machine-independent. To move projects across machines, explicitly update using the same source ID at its new path. Sources are trusted content, not authenticated packages.
 - Stable IDs survive source path changes, but explicit selections remain path-based. A removed selected leaf/branch fails update. Re-select intentionally using the prior source before migrating. Source versions are labels; explicit update may also intentionally restore an older revision.
+- Import/customize copies the full active source into an editable project fork. Its source files intentionally consume additional disk space and remain after removal. Sync updates current installed selections; there is no automatic upstream merge. Import checks cover structure and supported Markdown references, not arbitrary script/prose behavior. See `custom-skills.md` for conversions, repair guidance, and input limits.
 - Host structural verification is separate from actual host invocation and routing evaluation. No agent-run success, latency, or total-token claims have been measured.

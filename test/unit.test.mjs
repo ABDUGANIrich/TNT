@@ -44,6 +44,7 @@ const invalid = [
   ['cycles',m=>m.skills.find(s=>s.id==='testing.test-design').dependencies=[{kind:'skill',id:'react.forms'}],/cycle/],
   ['entry traversal',m=>m.skills[0].entry='../outside.md',/Invalid portable/],
   ['reserved file',m=>m.resources[0].path='lock.json',/Reserved path/],
+  ['source manifest as resource',m=>m.resources[0].path='library.json',/Reserved path/],
   ['nested skills',m=>m.skills[1].path='web/react/forms/nested',/must be leaves/],
   ['entry as resource',m=>m.resources[0].path='web/react/forms/instructions.md',/Duplicate managed file/],
   ['file as branch',m=>m.branches.push({path:'web/react/forms/instructions.md'}),/collision|leaves/],

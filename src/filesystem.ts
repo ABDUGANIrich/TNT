@@ -92,6 +92,9 @@ export async function commit(project: string, plan: Plan, previous: State | null
       await fs.mkdir(path.dirname(file),{recursive:true}); await writeDurable(file,b);
     }
     const after = await snapshot(stage);
+    for (const [p,b] of plan.files) {
+      if (!after.get(p)?.equals(b)) throw new Error(`Staged content does not match planned path: ${p}. Check file/directory casing; no live files were changed.`);
+    }
     // Recheck the live tree and bridge after staging, before the first destructive rename.
     if (digest(await snapshot(root)) !== digest(before)) throw new Error('Installation changed during staging; retry.');
     const currentBridge = plan.integration === 'unchanged' ? previous?.bridge ?? null : await bridgeBytes(project);

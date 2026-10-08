@@ -4,6 +4,8 @@ import { readState } from './state.js';
 import { loadSource } from './source.js';
 import { removeSelections } from './selection.js';
 import { planInstallation } from './planner.js';
+import { checkAuthoringNamespace, editableLocation } from './authoring.js';
+import path from 'node:path';
 
 export interface MutationOptions {
   command: 'install' | 'remove' | 'update'; selectors: string[]; all?: boolean;
@@ -23,6 +25,7 @@ export async function mutate(project: string, options: MutationOptions): Promise
       if (previous && options.command === 'install' && source.ref.revision !== previous.selection.source.revision) throw new Error('Source revision changed. Run update --source <directory|bundled> explicitly before adding selections.');
     }
     let selectors = previous?.selection.selectors ?? [];
+    if (source.ref.kind==='local' && path.resolve(source.ref.location)===editableLocation(project)) checkAuthoringNamespace(source.manifest);
     if (options.command === 'install') {
       if (!options.selectors.length && !options.all) throw new Error('install needs one or more selectors, or explicit --all.');
       selectors = [...new Set([...selectors, ...(options.all ? ['*'] : options.selectors)])].sort();

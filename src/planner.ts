@@ -5,7 +5,7 @@ import { resolve } from './dependencies.js';
 import { contentPaths } from './manifest.js';
 import { codexBridge } from './host.js';
 import { generateRouter } from './router.js';
-import { exists, hash, regularRead, safePath } from './paths.js';
+import { exists, hash, pathsConflict, regularRead, safePath } from './paths.js';
 import { packageRoot } from './source.js';
 
 export async function customization(project: string): Promise<Buffer> {
@@ -42,7 +42,7 @@ export async function planInstallation(project: string, source: Source, selectio
   const desiredPaths = [...files.keys()];
   if (previous) for (const p of previous.files.keys()) {
     if (p === 'lock.json' || Object.hasOwn(previous.lock.files,p)) continue;
-    if (desiredPaths.some(d => d.toLowerCase() === p.toLowerCase() || d.toLowerCase().startsWith(p.toLowerCase() + '/') || p.toLowerCase().startsWith(d.toLowerCase() + '/'))) throw new Error(`Unknown file conflicts with desired content: ${p}`);
+    if (desiredPaths.some(d => pathsConflict(d,p))) throw new Error(`Unknown file conflicts with desired content: ${p}`);
   }
   const integration = bridge?.equals(previous?.bridge ?? Buffer.from('')) || (!bridge && !previous?.bridge) ? 'unchanged' : bridge ? (previous?.bridge ? 'update Codex bridge' : 'add Codex bridge') : 'remove Codex bridge';
   return { selection, lock, files, bridge, additions: additions.sort(), updates: updates.sort(), removals: removals.sort(),

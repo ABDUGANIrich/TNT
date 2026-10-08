@@ -2,9 +2,16 @@
 
 A local, npm-distributed CLI for installing a selected part of an agent skill library while preserving its original hierarchy. One generated root router describes every installed workflow. Agents can choose relevant leaves and read their instructions directly.
 
-The command is **`skill-tree`**. The configured npm package name, **`progressive-skill-library-local`**, is provisional. Public availability and ownership have not been checked. This repository does not publish anything to npm.
+The npm package is **`@dev_abdugani/tnt-skills`** and the command is **`skill-tree`**. After the first public release, install it in your project:
 
-Requires **Node.js 22.14.0 or newer**. Runtime uses only Node built-ins; TypeScript and Node type definitions are development dependencies. The included library has 13 original workflows across web development, databases, testing, and documentation, plus 3 supporting resources.
+```sh
+npm install --save-dev @dev_abdugani/tnt-skills
+npx skill-tree install web/react --host codex
+```
+
+Use `--host none` (the default) when you only want the local tree. The local tarball workflow below also works before publication.
+
+Requires **Node.js 22.14.0 or newer**. Runtime uses Node built-ins and the pinned `yaml` parser for imported frontmatter; TypeScript and Node type definitions are development dependencies. The included library has 13 original workflows across web development, databases, testing, and documentation, plus 3 supporting resources.
 
 ## Try the verified local package
 
@@ -17,10 +24,10 @@ npm test
 npm run verify:package
 ```
 
-This creates `artifacts/progressive-skill-library-local-0.1.0.tgz`, inspects its file list, installs it into a disposable project, and exercises the installed npm command. In your own existing project, replace the quoted tarball path with its actual location:
+This creates `artifacts/dev_abdugani-tnt-skills-0.1.0.tgz`, inspects its file list, installs it into a disposable project, and exercises the installed npm command. In your own existing project, replace the quoted tarball path with its actual location:
 
 ```sh
-npm install --save-dev "/path/to/progressive-skill-library-local-0.1.0.tgz"
+npm install --save-dev "/path/to/dev_abdugani-tnt-skills-0.1.0.tgz"
 npx skill-tree install web/react
 npx skill-tree list
 npx skill-tree tree
@@ -29,10 +36,10 @@ npx skill-tree tree
 For one-off npx usage, without adding a project dependency:
 
 ```sh
-npx --package "/path/to/progressive-skill-library-local-0.1.0.tgz" skill-tree install web/react
+npx --package "/path/to/dev_abdugani-tnt-skills-0.1.0.tgz" skill-tree install web/react
 ```
 
-After the maintainer secures a public package name and deliberately publishes a release, the registry equivalents for the currently configured name would be `npx progressive-skill-library-local install web/react` and `npm install --save-dev progressive-skill-library-local`. These are future registry examples, not a claim that this name currently resolves to this project. If renamed, update `package.json`, regenerate the lockfile, and update these examples before release.
+After publication, one-off registry usage is `npx --package=@dev_abdugani/tnt-skills skill-tree install web/react`. Maintainers should run `npm run verify:release` before publishing; it runs type checks, tests, evaluation, the dependency audit, and clean tarball verification. These commands do not publish.
 
 There are no npm lifecycle hooks. Merely installing the package does not create skills, alter host configuration, or execute skill scripts.
 
@@ -69,6 +76,38 @@ Installing `web/react` creates:
 
 `react` never becomes the root. `web/vue` and files merely sitting in `web/` are not copied. The testing skill and shared files are explicit dependencies; the plan names them and explains their reasons. Installing `database/postgres` later adds that path without moving the existing leaves.
 
+## Import and edit your own skills
+
+You can import a standalone Markdown file or a self-contained external skill folder:
+
+```sh
+npx skill-tree check ./example.md
+npx skill-tree import ./example.md
+npx skill-tree check ./external-skill --into custom/review
+npx skill-tree import ./external-skill --into custom/review
+```
+
+`check` writes nothing and reports compatibility issues with concrete fixes. `import --dry-run` previews conversions and every planned file change. Imports register metadata, copy supporting resources, install the skill, and regenerate the router. `SKILL.md` entries become `instructions.md`; supported Markdown self-links are adjusted. Required instructions can be declared with repeated `--requires <existing-skill-id>` options. Missing descriptions can be supplied with `--description "When to use this skill"`.
+
+The command prints an **editable source path**, such as `.skill-tree/editable-library/custom/example/example.md`. Edit that file in your editor, then apply the changes:
+
+```sh
+npx skill-tree sync --dry-run
+npx skill-tree sync
+```
+
+To customize an already installed example:
+
+```sh
+npx skill-tree customize react.forms
+```
+
+This prints the editable path; modify it and run `sync`. Name, description, tags, and prerequisites are editable in `.skill-tree/editable-library/library.json`. The installed copies and generated router retain checksum protection. `sync` preserves current selection intent and fails safely if the edited source is invalid.
+
+The first import/customize on an existing installation creates an editable copy of its **complete source**, keeping the installed selections unchanged. That local copy becomes the single active source; it does not automatically merge future upstream changes. On an empty project, import starts a custom-only library. Install example branches first if you want to combine examples and custom skills. Removing an installed selection retains its editable source for later reuse.
+
+Compatibility checks cover structure and supported local Markdown references. They cannot prove that external tools, scripts, or the workflow itself will work. Host-specific permissions/configuration and nested skills require adaptation instead of being silently imported. See [custom skills and compatibility](docs/custom-skills.md) for supported formats, repair examples, and limits.
+
 ## Root router and agent use
 
 `.skill-tree/SKILL.md` is the single canonical router. It combines an authored navigation template, the complete installed hierarchy, descriptions, direct instruction paths, and explicit prerequisite links. It is deterministic, contains no timestamps or absolute machine paths, and is regenerated with each successful content change. A large map produces a configurable warning; it is never silently truncated.
@@ -99,6 +138,10 @@ Codex initially sees the bridge's name, description, and path. If it chooses the
 | `remove <path>...` | Remove exact explicit selections; retain content still required elsewhere |
 | `remove --all` | Clear selections; preserve state and unknown files |
 | `update --source <directory\|bundled>` | Reconcile selection intent against an explicitly chosen content revision |
+| `check <file\|folder>` | Report structural import compatibility and actionable fixes without writes |
+| `import <file\|folder>` | Register and install a custom skill in an editable project source |
+| `customize <installed-skill-id>` | Create editable source if needed and print the instruction file to edit |
+| `sync` | Validate the editable project source and refresh the current installed selections |
 | `list` | Show installed skills and selection/dependency reasons |
 | `tree` | Display the complete installed hierarchy |
 | `search "form validation"` | Match all query terms against installed metadata, without opening leaf/resource bodies |
@@ -110,7 +153,7 @@ Codex initially sees the bridge's name, description, and path. If it chooses the
 
 `--project <directory>` uses that existing project instead of the current directory. `--json` supplies structured output. `--help` and `--version` are supported. Errors go to stderr and exit nonzero. Unknown or inapplicable flags fail rather than being ignored.
 
-`install`, `remove`, `update`, and `recover` support `--dry-run`; plans include additions, updates, removals, dependency reasons, integration changes, and router size. Dry runs do not create locks, directories, or files. `--warn-bytes 16384` changes and persists the router warning threshold on a mutation (default 32,768 bytes).
+`install`, `remove`, `update`, `import`, `customize`, `sync`, and `recover` support `--dry-run`; plans include additions, updates, removals, dependency reasons, integration changes, and router size. Dry runs do not create locks, directories, or files. `--warn-bytes 16384` changes and persists the router warning threshold on install/remove/update (default 32,768 bytes).
 
 Explicit selections are saved separately from resolved content. If `web/react` is selected, removing `web/react/forms` reports that the parent still includes it. There are no implicit exclusions. Remove the parent selection, then explicitly install the desired leaves. Overlapping explicit selections are retained individually and can be removed individually.
 

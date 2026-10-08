@@ -19,7 +19,7 @@ export function validateManifest(value: unknown): Manifest {
   const ids = new Set<string>(); const paths = new Map<string, string>(); const files: string[] = [];
   const reserve = (p: unknown, kind: string): void => {
     canonical(p);
-    if (['skill.md','selection.json','lock.json','router-template.md','navigation.md'].includes(p.split('/')[0]!.toLowerCase())) throw new Error(`Reserved path: ${p}`);
+    if (['library.json','skill.md','selection.json','lock.json','router-template.md','navigation.md'].includes(p.split('/')[0]!.toLowerCase())) throw new Error(`Reserved path: ${p}`);
     const lower = p.toLowerCase();
     if (paths.has(lower)) throw new Error(`Duplicate path: ${p}`);
     paths.set(lower, kind);

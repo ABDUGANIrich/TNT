@@ -53,7 +53,8 @@ test('all is explicit, full install works, inspection and argument failures are 
   assert.equal(JSON.parse(cli(f.project,['explain','react.forms','--json']).stdout).dependencies[0].kind,'skill');
   assert.equal(JSON.parse(cli(f.project,['list','--json']).stdout).skills.length,13);
   cli(f.project,['explain','missing'],1);cli(f.project,['search'],1);cli(f.project,['nonsense'],1);cli(f.project,['list','--dry-run'],1);
-  assert.match(cli(f.project,['--version']).stdout,/^0\.1\.0/);assert.match(cli(f.project,['--help']).stdout,/Usage:/);
+  const packageInfo=JSON.parse(await fs.readFile(path.join(repository,'package.json'),'utf8'));
+  assert.equal(cli(f.project,['--version']).stdout.trim(),packageInfo.version);assert.match(cli(f.project,['--help']).stdout,/Usage:/);
 });
 test('every mutating dry run leaves even directory state unchanged',async t=>{
   const f=await fixture(t);let before=await treeSnapshot(f.project);
@@ -182,6 +183,21 @@ test('modified host bridge is preserved and stops mutation',async t=>{
   const f=await fixture(t);cli(f.project,['install','web/react','--host','codex']);
   const bridge=path.join(f.project,'.agents/skills/progressive-skill-library/SKILL.md');await fs.appendFile(bridge,'\nUser change.\n');
   const before=await treeSnapshot(f.project);assert.match(cli(f.project,['install','database/postgres'],1).stderr,/bridge was locally modified/);assert.deepEqual(await treeSnapshot(f.project),before);
+});
+test('unknown files prevent case aliases in shared directory names',async t=>{
+  const f=await fixture(t);cli(f.project,['install','web/react']);
+  await fs.mkdir(file(f,'Custom'));await fs.writeFile(file(f,'Custom/notes.txt'),'User notes');
+  const input=path.join(f.base,'example.md');await fs.writeFile(input,'# Review\n\nReview a release.\n');
+  const before=await treeSnapshot(f.project);
+  assert.match(cli(f.project,['import',input,'--into','custom/review'],1).stderr,/Unknown file conflicts/);
+  assert.deepEqual(await treeSnapshot(f.project),before);cli(f.project,['doctor']);
+});
+test('staging refuses a path with incorrect directory casing on Windows',{skip:process.platform!=='win32'},async t=>{
+  const f=await fixture(t);cli(f.project,['install','web/react']);await fs.mkdir(file(f,'Custom'));
+  const input=path.join(f.base,'example.md');await fs.writeFile(input,'# Review\n\nReview a release.\n');
+  const before=await treeSnapshot(f.project);
+  assert.match(cli(f.project,['import',input,'--into','custom/review'],1).stderr,/Staged content does not match/);
+  assert.deepEqual(await treeSnapshot(f.project),before);cli(f.project,['doctor']);
 });
 test('unknown prototype-named files cannot be claimed by a future resource',async t=>{
   const f=await fixture(t);cli(f.project,['install','web/react','--source',f.source]);await fs.writeFile(file(f,'constructor'),'user owned');
