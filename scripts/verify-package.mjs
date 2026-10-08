@@ -1,0 +1,63 @@
+import * as fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import assert from 'node:assert/strict';
+
+const root=fileURLToPath(new URL('../',import.meta.url));
+const npmCli=process.env.npm_execpath;
+if(!npmCli) throw new Error('Run with npm run verify:package so npm_execpath is available.');
+const run=(args,cwd)=>{
+  const r=spawnSync(process.execPath,[npmCli,...args],{cwd,encoding:'utf8',maxBuffer:8*1024*1024});
+  assert.equal(r.status,0,`${args.join(' ')}\n${r.stdout}\n${r.stderr}\n${r.error ?? ''}`);return r.stdout;
+};
+const artifacts=path.join(root,'artifacts');await fs.mkdir(artifacts,{recursive:true});
+const packed=JSON.parse(run(['pack','--json','--pack-destination',artifacts],root));
+const pack=Array.isArray(packed)?packed[0]:Object.values(packed)[0];
+const paths=pack.files.map(f=>f.path);
+for(const required of ['dist/cli.js','dist/source.js','dist/filesystem.js','library/library.json','templates/router.md','package.json','README.md','LICENSE']) assert.ok(paths.includes(required),`Missing ${required}`);
+for(const p of paths) assert.ok(['dist/','library/','templates/','docs/'].some(prefix=>p.startsWith(prefix)) || ['package.json','README.md','LICENSE'].includes(p),`Unexpected packed file: ${p}`);
+assert.ok(!paths.some(p=>p.includes('node_modules')||p.startsWith('test/')));
+const manifest=JSON.parse(await fs.readFile(path.join(root,'library/library.json'),'utf8'));
+for(const s of manifest.skills) assert.ok(paths.includes(`library/${s.path}/${s.entry}`));
+for(const r of manifest.resources) assert.ok(paths.includes(`library/${r.path}`));
+const tempRoot=await fs.realpath(os.tmpdir());
+const temp=await fs.mkdtemp(path.join(tempRoot,"skill-tree package's "));
+const tarball=path.join(artifacts,pack.filename);
+const exercised=[];
+try {
+  await fs.writeFile(path.join(temp,'package.json'),JSON.stringify({name:'package-smoke-project',version:'1.0.0',private:true}));
+  run(['install','--save-dev','--no-audit','--no-fund',tarball],temp);
+  await assert.rejects(fs.stat(path.join(temp,'.skill-tree')),{code:'ENOENT'});
+  const packageInfo=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'));
+  const installed=path.join(temp,'node_modules',packageInfo.name);
+  const metadata=JSON.parse(await fs.readFile(path.join(installed,'package.json'),'utf8'));
+  for(const hook of ['preinstall','install','postinstall','prepare']) assert.ok(!metadata.scripts?.[hook],`Unexpected lifecycle hook: ${hook}`);
+  assert.ok(!metadata.dependencies || Object.keys(metadata.dependencies).length===0);
+  assert.equal(metadata.bin['skill-tree'],'dist/cli.js');
+  assert.match(await fs.readFile(path.join(installed,'dist/cli.js'),'utf8'),/^#!\/usr\/bin\/env node\n/);
+  await assert.rejects(fs.stat(path.join(temp,'node_modules/typescript')),{code:'ENOENT'});
+  await fs.stat(path.join(temp,'node_modules/.bin',process.platform==='win32'?'skill-tree.cmd':'skill-tree'));
+  const cli=(...args)=>{exercised.push(args);return run(['exec','--offline','--','skill-tree',...args],temp);};
+  cli('--help');assert.equal(cli('--version').trim(),packageInfo.version);
+  const dry=JSON.parse(cli('install','web/react','--host','codex','--dry-run','--json'));assert.ok(dry.additions.length);
+  await assert.rejects(fs.stat(path.join(temp,'.skill-tree')),{code:'ENOENT'});
+  cli('install','web/react','--host','codex');
+  const router=await fs.readFile(path.join(temp,'.skill-tree/SKILL.md'),'utf8');assert.match(router,/web\/react\/forms\/instructions.md/);
+  await assert.rejects(fs.stat(path.join(temp,'.skill-tree/web/vue')),{code:'ENOENT'});
+  cli('install','database/postgres');
+  assert.equal(JSON.parse(cli('install','database/postgres','--json')).changed,false);
+  cli('list','--json');cli('tree');cli('search','form validation','--json');cli('explain','react.forms');cli('stats');cli('validate');cli('doctor');
+  cli('update','--source','bundled');
+  cli('remove','web/react');
+  const remaining=JSON.parse(cli('list','--json')).skills;
+  assert.ok(remaining.some(s=>s.id==='postgres.migrations'));assert.ok(!remaining.some(s=>s.id==='react.forms'));
+  cli('doctor');cli('remove','--all');cli('doctor');
+  const report={package:packageInfo.name,version:packageInfo.version,node:process.version,platform:process.platform,tarball:pack.filename,sha512Integrity:pack.integrity,packedFiles:paths,packedBytes:pack.size,unpackedBytes:pack.unpackedSize,commands:exercised,verified:'Passed clean tarball installation and packaged CLI smoke checks. No npm publication.'};
+  await fs.writeFile(path.join(artifacts,'package-verification.json'),JSON.stringify(report,null,2)+'\n');
+  console.log(JSON.stringify({tarball,files:paths.length,packedBytes:pack.size,commands:exercised.length,result:'passed'},null,2));
+} finally {
+  if(!path.resolve(temp).startsWith(tempRoot+path.sep)||!path.basename(temp).startsWith("skill-tree package's "))throw new Error('Unsafe cleanup path');
+  await fs.rm(temp,{recursive:true,force:true});
+}

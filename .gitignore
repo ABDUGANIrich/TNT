@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tgz
+.skill-tree/
+.skill-tree-*/
+.skill-tree-mutation.lock
+.skill-tree-recovery.lock
+artifacts/

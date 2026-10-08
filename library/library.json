@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "id": "progressive-examples",
+  "version": "1.0.0",
+  "name": "Progressive Skill Library",
+  "description": "Focused workflows for web implementation, database changes, testing, and engineering documentation.",
+  "branches": [
+    { "path": "web", "description": "Browser interfaces and HTTP behavior" },
+    { "path": "web/react" },
+    { "path": "web/vue" },
+    { "path": "database", "description": "Schema safety and query diagnosis" },
+    { "path": "database/postgres" },
+    { "path": "testing" },
+    { "path": "documentation" },
+    { "path": "shared", "description": "Supporting resources, not instructions" }
+  ],
+  "skills": [
+    {
+      "id": "react.forms", "path": "web/react/forms", "name": "React forms",
+      "description": "Implement form validation, submission states, and accessible error recovery in React",
+      "entry": "instructions.md", "dependencies": [{ "kind": "skill", "id": "testing.test-design" }, { "kind": "resource", "id": "resource.form-matrix" }],
+      "aliases": ["form validation", "submit", "field errors"], "tags": ["react", "forms"], "prerequisites": ["Existing React project and its test runner"]
+    },
+    {
+      "id": "react.performance", "path": "web/react/performance", "name": "React performance",
+      "description": "Diagnose unnecessary React renders and slow interactions using measurements",
+      "entry": "instructions.md", "dependencies": [{ "kind": "resource", "id": "resource.measurements" }],
+      "tags": ["profiling", "render", "latency"], "prerequisites": ["Browser profiling tools"]
+    },
+    {
+      "id": "react.state", "path": "web/react/state", "name": "React state ownership",
+      "description": "Untangle duplicated state, stale async results, and component ownership boundaries",
+      "entry": "instructions.md", "dependencies": [], "tags": ["state", "race conditions"]
+    },
+    {
+      "id": "vue.components", "path": "web/vue/components", "name": "Vue component contracts",
+      "description": "Design Vue props, emits, slots, and component boundaries for predictable reuse",
+      "entry": "instructions.md", "dependencies": [], "tags": ["vue", "components"]
+    },
+    {
+      "id": "web.accessible-forms", "path": "web/accessibility/forms", "name": "Accessible forms",
+      "description": "Audit labels, focus order, error announcements, and keyboard recovery in browser forms",
+      "entry": "instructions.md", "dependencies": [{ "kind": "resource", "id": "resource.form-matrix" }], "tags": ["accessibility", "keyboard", "form validation"]
+    },
+    {
+      "id": "web.http-cache", "path": "web/http/caching", "name": "HTTP cache diagnosis",
+      "description": "Trace stale browser or proxy responses and design explicit cache invalidation behavior",
+      "entry": "instructions.md", "dependencies": [], "tags": ["http", "cache", "etag"]
+    },
+    {
+      "id": "database.change-safety", "path": "database/foundations/change-safety", "name": "Database change safety",
+      "description": "Define compatibility, rollback, and validation gates before changing persisted data",
+      "entry": "instructions.md", "dependencies": [], "tags": ["rollback", "data safety"]
+    },
+    {
+      "id": "postgres.migrations", "path": "database/postgres/migrations", "name": "PostgreSQL migrations",
+      "description": "Plan staged PostgreSQL schema changes with compatibility and backfill checkpoints",
+      "entry": "instructions.md", "dependencies": [{ "kind": "skill", "id": "database.change-safety" }], "tags": ["postgres", "schema", "migration"], "prerequisites": ["Migration framework and disposable PostgreSQL test database"]
+    },
+    {
+      "id": "postgres.query-plans", "path": "database/postgres/query-plans", "name": "PostgreSQL query plans",
+      "description": "Compare query plans, row estimates, and index tradeoffs for a specific slow query",
+      "entry": "instructions.md", "dependencies": [{ "kind": "resource", "id": "resource.measurements" }], "tags": ["postgres", "query", "index", "performance"]
+    },
+    {
+      "id": "testing.test-design", "path": "testing/unit/test-design", "name": "Behavioral test design",
+      "description": "Derive boundary cases and observable assertions from a behavior contract",
+      "entry": "instructions.md", "dependencies": [], "tags": ["tests", "boundaries", "validation"]
+    },
+    {
+      "id": "testing.contracts", "path": "testing/integration/contracts", "name": "Integration contracts",
+      "description": "Test producer-consumer compatibility, retries, and error semantics across a service boundary",
+      "entry": "instructions.md", "dependencies": [{ "kind": "skill", "id": "testing.test-design" }], "tags": ["api", "integration", "contract"]
+    },
+    {
+      "id": "docs.decisions", "path": "documentation/architecture/decisions", "name": "Decision records",
+      "description": "Record an engineering decision with constraints, rejected alternatives, and reversal triggers",
+      "entry": "instructions.md", "dependencies": [], "aliases": ["ADR", "architecture decision"]
+    },
+    {
+      "id": "docs.runbooks", "path": "documentation/operations/runbooks", "name": "Operational runbooks",
+      "description": "Write a verifiable incident runbook with diagnosis, recovery, and stop conditions",
+      "entry": "instructions.md", "dependencies": [{ "kind": "resource", "id": "resource.json-summary" }], "tags": ["operations", "incident", "runbook"]
+    }
+  ],
+  "resources": [
+    { "id": "resource.form-matrix", "path": "shared/forms/case-matrix.md", "name": "Form case matrix", "description": "Worksheet for inputs, outcomes, focus targets, and announcements" },
+    { "id": "resource.measurements", "path": "shared/performance/measurement.md", "name": "Measurement worksheet", "description": "Comparable baseline and intervention measurements with environment controls" },
+    { "id": "resource.json-summary", "path": "shared/scripts/json-keys.mjs", "name": "JSON shape helper", "description": "Optional local script reporting JSON top-level keys without printing values" }
+  ]
+}

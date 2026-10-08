@@ -1,0 +1,18 @@
+{
+  "name": "progressive-skill-library-local",
+  "version": "0.1.0",
+  "description": "Install and maintain a hierarchical, selectively loaded library of agent workflows",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.14.0" },
+  "bin": { "skill-tree": "dist/cli.js" },
+  "files": ["dist/", "library/", "templates/", "docs/", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/unit.test.mjs test/integration.test.mjs",
+    "verify:package": "npm run build && node scripts/verify-package.mjs",
+    "evaluate": "npm run build && node scripts/evaluate.mjs"
+  },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "~5.9.3" }
+}
